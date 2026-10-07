@@ -491,6 +491,9 @@ pub struct CursorStateInner {
     image_cache: Vec<CachedFrame>,
 
     hidden: Option<HideReason>,
+    /// Hidden while an InputCapture session is diverting the pointer off-screen.
+    /// Orthogonal to idle-hide: pointer activity must not reveal this cursor.
+    hidden_for_input_capture: bool,
     idle_timer: Option<RegistrationToken>,
     last_armed: Option<Instant>,
     last_pointer_activity: Instant,
@@ -724,6 +727,7 @@ impl Default for CursorStateInner {
             image_cache: Vec::new(),
 
             hidden: None,
+            hidden_for_input_capture: false,
             last_pointer_activity: Instant::now(),
             idle_timer: None,
             last_armed: None,
@@ -777,7 +781,7 @@ pub fn draw_cursor<R>(
     let mut state_ref = seat_userdata.get::<CursorState>().unwrap().lock().unwrap();
     let state = &mut *state_ref;
 
-    if state.hidden.is_some() {
+    if state.hidden.is_some() || state.hidden_for_input_capture {
         return;
     }
 
@@ -874,6 +878,10 @@ pub fn notify_cursor_activity(state: &State, seat: &Seat<State>, kind: PointerEv
 
     let revealed = {
         let mut inner = cursor_state.lock().unwrap();
+        // Captured motion must not reveal the local cursor or re-arm idle-hide.
+        if inner.hidden_for_input_capture {
+            return false;
+        }
         inner.last_pointer_activity = Instant::now();
         match inner.hidden {
             Some(reason) if reason.revealed_by(kind) => {
@@ -908,7 +916,7 @@ pub fn refresh_idle_timer(state: &State, seat: &Seat<State>) {
 
     let (old_token, since_activity) = {
         let mut inner = cursor_state.lock().unwrap();
-        if inner.hidden.is_some() {
+        if inner.hidden.is_some() || inner.hidden_for_input_capture {
             return;
         }
         // Coalesce bursts from high-frequency pointers.
@@ -1013,6 +1021,45 @@ fn hide_cursor(state: &mut State, seat: &Seat<State>, reason: HideReason) {
         }
         inner.hidden = Some(reason);
     }
+    schedule_cursor_render(state);
+}
+
+/// Hide or reveal the hardware cursor for an active InputCapture session.
+///
+/// Unlike idle-hide, this is not cleared by pointer activity: captured motion
+/// and clicks must keep the local sprite invisible until capture ends.
+pub fn set_hidden_for_input_capture(state: &mut State, hidden: bool) {
+    let seats: Vec<_> = state.common.shell.read().seats.iter().cloned().collect();
+    let mut changed = false;
+    let mut idle_tokens = Vec::new();
+    for seat in &seats {
+        let Some(cursor_state) = seat.user_data().get::<CursorState>() else {
+            continue;
+        };
+        let mut inner = cursor_state.lock().unwrap();
+        if inner.hidden_for_input_capture != hidden {
+            inner.hidden_for_input_capture = hidden;
+            // A capture session owns pointer visibility. Do not let an
+            // already-armed idle-hide timer re-hide the cursor after release.
+            inner.hidden = None;
+            if hidden {
+                if let Some(token) = inner.idle_timer.take() {
+                    idle_tokens.push(token);
+                }
+                inner.last_armed = None;
+            }
+            changed = true;
+        }
+    }
+    for token in idle_tokens {
+        state.common.event_loop_handle.remove(token);
+    }
+    if changed {
+        schedule_cursor_render(state);
+    }
+}
+
+fn schedule_cursor_render(state: &mut State) {
     let outputs: Vec<_> = state.common.shell.read().outputs().cloned().collect();
     for output in outputs {
         state.backend.schedule_render(&output);

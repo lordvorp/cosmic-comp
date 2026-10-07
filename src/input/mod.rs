@@ -81,7 +81,7 @@ use smithay::{
         seat::WaylandFocus,
     },
 };
-use tracing::{error, trace};
+use tracing::error;
 use xkbcommon::xkb::{Keycode, Keysym};
 
 use std::{
@@ -234,6 +234,12 @@ impl State {
             crate::wayland::handlers::output_power::set_all_surfaces_dpms_on(self);
         }
 
+        if matches!(&backend_id, InputBackendId::Normal) {
+            let dbus = self.common.dbus_state.clone();
+            self.common.input_capture.revoke_if_portal_gone(&dbus);
+            self.sync_input_capture_cursor_visibility();
+        }
+
         use smithay::backend::input::Event;
         match event {
             InputEvent::DeviceAdded { device } => {
@@ -282,14 +288,13 @@ impl State {
                     .for_device(&event.device(), &backend_id)
                     .cloned();
                 if let Some(seat) = maybe_seat {
-                    self.common.idle_notifier_state.notify_activity(&seat);
-
                     let keycode = event.key_code();
                     let state = event.state();
-                    trace!(?keycode, ?state, "key");
+                    let time = Event::time(&event);
+
+                    self.common.idle_notifier_state.notify_activity(&seat);
 
                     let serial = SERIAL_COUNTER.next_serial();
-                    let time = Event::time(&event);
                     let keyboard = seat.get_keyboard().unwrap();
                     let previous_modifiers = keyboard.modifier_state();
                     if let Some((action, pattern)) = keyboard
@@ -300,6 +305,20 @@ impl State {
                             serial,
                             time,
                             |data, modifiers, handle| {
+                                if matches!(&backend_id, InputBackendId::Normal)
+                                    && data.common.input_capture.captures_keyboard()
+                                    && data.common.input_capture.keyboard(
+                                        time,
+                                        keycode.raw(),
+                                        state,
+                                    )
+                                {
+                                    // `KeyboardHandle::input` has already updated Smithay's
+                                    // internal XKB state. Intercepting here keeps that state
+                                    // correct for modifiers while withholding the key from
+                                    // local Wayland clients and compositor shortcuts.
+                                    return FilterResult::Intercept(None);
+                                }
                                 data.process_keyboard_filter(
                                     &backend_id,
                                     &seat,
@@ -364,6 +383,36 @@ impl State {
 
             InputEvent::PointerMotion { event, .. } => {
                 use smithay::backend::input::PointerMotionEvent as _;
+
+                if matches!(&backend_id, InputBackendId::Normal) {
+                    let maybe_seat = self
+                        .common
+                        .shell
+                        .read()
+                        .seats
+                        .for_device(&event.device(), &backend_id)
+                        .cloned();
+                    if let Some(seat) = maybe_seat
+                        && let Some(pointer) = seat.get_pointer()
+                    {
+                        let position = pointer.current_location().as_global();
+                        let modifiers = seat
+                            .get_keyboard()
+                            .map(|keyboard| keyboard.modifier_state().serialized);
+                        let dbus = self.common.dbus_state.clone();
+                        if self.common.input_capture.motion(
+                            &dbus,
+                            (position.x, position.y),
+                            (event.delta().x, event.delta().y),
+                            event.time(),
+                            modifiers,
+                        ) {
+                            self.common.idle_notifier_state.notify_activity(&seat);
+                            self.sync_input_capture_cursor_visibility();
+                            return;
+                        }
+                    }
+                }
 
                 let shell = self.common.shell.write();
                 if let Some(seat) = shell
@@ -841,6 +890,16 @@ impl State {
                     return;
                 };
                 self.common.idle_notifier_state.notify_activity(&seat);
+
+                let button = event.button_code();
+                if matches!(&backend_id, InputBackendId::Normal)
+                    && self
+                        .common
+                        .input_capture
+                        .button(event.time(), button, event.state())
+                {
+                    return;
+                }
                 notify_cursor_activity(self, &seat, PointerEventKind::Other);
 
                 let current_focus = seat.get_keyboard().unwrap().current_focus();
@@ -856,7 +915,6 @@ impl State {
                 });
 
                 let serial = SERIAL_COUNTER.next_serial();
-                let button = event.button_code();
 
                 // Track buttons held by a libei source so they can be released if the connection
                 // drops mid-press
@@ -1091,6 +1149,40 @@ impl State {
                     .for_device(&event.device(), &backend_id)
                     .cloned();
                 if let Some(seat) = maybe_seat {
+                    if matches!(&backend_id, InputBackendId::Normal) {
+                        let direction = |axis| {
+                            if event.relative_direction(axis) == AxisRelativeDirection::Inverted {
+                                -1.0
+                            } else {
+                                1.0
+                            }
+                        };
+                        let horizontal_direction = direction(Axis::Horizontal);
+                        let vertical_direction = direction(Axis::Vertical);
+                        if self.common.input_capture.axis(
+                            event.time(),
+                            event.source(),
+                            (
+                                event
+                                    .amount(Axis::Horizontal)
+                                    .map(|amount| amount * horizontal_direction),
+                                event
+                                    .amount(Axis::Vertical)
+                                    .map(|amount| amount * vertical_direction),
+                            ),
+                            (
+                                event
+                                    .amount_v120(Axis::Horizontal)
+                                    .map(|amount| amount * horizontal_direction),
+                                event
+                                    .amount_v120(Axis::Vertical)
+                                    .map(|amount| amount * vertical_direction),
+                            ),
+                        ) {
+                            return;
+                        }
+                    }
+
                     self.common.idle_notifier_state.notify_activity(&seat);
                     notify_cursor_activity(self, &seat, PointerEventKind::Other);
 
@@ -2582,11 +2674,6 @@ impl State {
                 && a11y_keyboard_monitor.has_virtual_mod(handle.modified_sym())
             {
                 a11y_keyboard_monitor.add_active_virtual_mod(handle.modified_sym());
-
-                tracing::debug!(
-                    "active virtual mods: {:?}",
-                    a11y_keyboard_monitor.active_virtual_mods()
-                );
                 seat.supressed_keys().add(backend_id, &handle, None);
 
                 return FilterResult::Intercept(None);
