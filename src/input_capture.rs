@@ -1390,4 +1390,98 @@ mod tests {
         capture.active = false;
         assert!(!capture.hides_cursor());
     }
+
+    #[test]
+    fn connect_rejects_invalid_capability_bits() {
+        let mut capture = InputCaptureState::default();
+        let (stream, _peer) = UnixStream::pair().unwrap();
+        assert!(
+            capture
+                .connect("s".into(), ":1.1".into(), 0, stream)
+                .is_err()
+        );
+        let (stream, _peer) = UnixStream::pair().unwrap();
+        assert!(
+            capture
+                .connect("s".into(), ":1.1".into(), 1 << 10, stream)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn enable_rejects_unknown_session_and_missing_eis() {
+        let mut capture = InputCaptureState::default();
+        assert!(capture.enable("missing").is_err());
+
+        let (stream, _peer) = UnixStream::pair().unwrap();
+        let _ctx = capture
+            .connect("s".into(), ":1.1".into(), DEVICE_POINTER, stream)
+            .unwrap();
+        // connect() returns the EIS context; the seat peer is attached later.
+        // Enable must not arm capture without that handshake.
+        assert_eq!(capture.enable("s").unwrap_err(), "EIS is not connected");
+        assert!(!capture.enabled);
+    }
+
+    #[test]
+    fn release_applies_only_to_active_matching_activation() {
+        let mut capture = InputCaptureState {
+            session_handle: Some("s".into()),
+            active: true,
+            activation_id: 3,
+            ..Default::default()
+        };
+        assert!(capture.release_applies("s", None));
+        assert!(capture.release_applies("s", Some(3)));
+        assert!(!capture.release_applies("s", Some(4)));
+        assert!(!capture.release_applies("other", None));
+        capture.active = false;
+        assert!(!capture.release_applies("s", None));
+        // Stale activation ids are ignored (no error) so clients can race Release.
+        assert!(capture.release("s", Some(99), None).is_ok());
+    }
+
+    #[test]
+    fn disable_unknown_session_is_rejected() {
+        let mut capture = InputCaptureState::default();
+        assert!(capture.disable("missing").is_err());
+        let (stream, _peer) = UnixStream::pair().unwrap();
+        capture
+            .connect("s".into(), ":1.1".into(), DEVICE_POINTER, stream)
+            .unwrap();
+        capture.enabled = true;
+        assert!(capture.disable("s").is_ok());
+        assert!(!capture.enabled);
+    }
+
+    #[test]
+    fn barrier_motion_fuzz_never_triggers_without_direction() {
+        let capture = InputCaptureState {
+            barriers: vec![Barrier::new(1, (100, 0, 100, 200))],
+            ..Default::default()
+        };
+        // No direction => never a trigger, including NaN / Inf deltas.
+        let samples = [
+            ((0.0, 0.0), (0.0, 0.0)),
+            ((99.0, 50.0), (2.0, 0.0)),
+            ((f64::NAN, 50.0), (1.0, 0.0)),
+            ((50.0, f64::INFINITY), (0.0, 1.0)),
+            ((f64::NEG_INFINITY, 0.0), (f64::INFINITY, 0.0)),
+        ];
+        for (pos, delta) in samples {
+            assert_eq!(capture.triggered_barrier(pos, delta), None);
+        }
+    }
+
+    #[test]
+    fn captures_keyboard_requires_active_unlocked_keyboard_device() {
+        let mut capture = InputCaptureState {
+            active: true,
+            device_types: DEVICE_KEYBOARD,
+            ..Default::default()
+        };
+        assert!(!capture.captures_keyboard());
+        capture.locked = true;
+        assert!(!capture.captures_keyboard());
+    }
 }
