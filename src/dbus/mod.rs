@@ -16,6 +16,7 @@ use tracing::{error, warn};
 pub mod a11y_keyboard_monitor;
 use a11y_keyboard_monitor::A11yKeyboardMonitorState;
 pub mod ei;
+pub mod input_capture;
 #[cfg(feature = "logind")]
 pub mod logind;
 mod name_owners;
@@ -33,6 +34,9 @@ struct DBusStateInner {
     a11y_keyboard_monitor: RefCell<Option<a11y_keyboard_monitor::A11yKeyboardMonitorState>>,
     ei_state: RefCell<Option<ei::EiState>>,
     ei_sender: Arc<Mutex<Option<calloop::channel::Sender<crate::libei::EiRequest>>>>,
+    input_capture_sender:
+        Arc<Mutex<Option<calloop::channel::Sender<crate::input_capture::Request>>>>,
+    input_capture_names: RefCell<Option<name_owners::NameOwners>>,
 }
 
 impl DBusState {
@@ -48,6 +52,8 @@ impl DBusState {
             a11y_keyboard_monitor: RefCell::new(None),
             ei_state: RefCell::new(None),
             ei_sender: Arc::new(Mutex::new(None)),
+            input_capture_sender: Arc::new(Mutex::new(None)),
+            input_capture_names: RefCell::new(None),
         }));
         evlh.insert_source(source, |_, _, _| {}).unwrap();
         let state_clone = state.clone();
@@ -79,6 +85,86 @@ impl DBusState {
         *self.0.ei_sender.lock().unwrap() = Some(sender);
     }
 
+    pub(crate) fn set_input_capture(
+        &self,
+        sender: calloop::channel::Sender<crate::input_capture::Request>,
+    ) {
+        *self.0.input_capture_sender.lock().unwrap() = Some(sender);
+    }
+
+    pub(crate) fn portal_owns_input_capture(&self, sender: &str) -> bool {
+        let Ok(sender) = zbus::names::UniqueName::try_from(sender) else {
+            return false;
+        };
+        let Some(names) = self.0.input_capture_names.borrow().clone() else {
+            return false;
+        };
+        let allowed = [zbus::names::WellKnownName::from_static_str_unchecked(
+            "org.freedesktop.impl.portal.desktop.cosmic",
+        )];
+        names.check_owner_strict_no_poll(&sender, &allowed)
+    }
+
+    pub(crate) fn emit_input_capture_signal(&self, signal: crate::input_capture::Signal) {
+        let state = self.clone();
+        self.spawn(async move {
+            let Ok(conn) = state.session_conn().await else {
+                return;
+            };
+            let Ok(iface) = conn
+                .object_server()
+                .interface::<_, input_capture::InputCapture>(input_capture::PATH)
+                .await
+            else {
+                return;
+            };
+            let emitter = iface.signal_emitter();
+            let result = match signal {
+                crate::input_capture::Signal::Activated {
+                    session_handle,
+                    activation_id,
+                    barrier_id,
+                    cursor_position,
+                } => {
+                    input_capture::InputCapture::activated(
+                        emitter,
+                        &session_handle,
+                        activation_id,
+                        barrier_id,
+                        cursor_position,
+                    )
+                    .await
+                }
+                crate::input_capture::Signal::Deactivated {
+                    session_handle,
+                    activation_id,
+                    cursor_position,
+                } => {
+                    input_capture::InputCapture::deactivated(
+                        emitter,
+                        &session_handle,
+                        activation_id,
+                        cursor_position,
+                    )
+                    .await
+                }
+                crate::input_capture::Signal::Disabled { session_handle } => {
+                    input_capture::InputCapture::disabled(emitter, &session_handle).await
+                }
+                crate::input_capture::Signal::ZonesChanged {
+                    session_handle,
+                    zone_set,
+                } => {
+                    input_capture::InputCapture::zones_changed(emitter, &session_handle, zone_set)
+                        .await
+                }
+            };
+            if let Err(err) = result {
+                tracing::debug!(?err, "Failed to emit InputCapture signal");
+            }
+        });
+    }
+
     // TODO Lazy async init when we don't have anything blocking main thread
     async fn session_conn(&self) -> zbus::Result<&zbus::Connection> {
         self.0.session_conn.as_ref().map_err(|err| err.clone())
@@ -96,6 +182,7 @@ impl DBusState {
 async fn init_session(state: &DBusState) -> zbus::Result<()> {
     let conn = state.session_conn().await?;
     let name_owners = name_owners::NameOwners::new(conn, &state.0.executor).await?;
+    *state.0.input_capture_names.borrow_mut() = Some(name_owners.clone());
     let a11y_keyboard_monitor_state =
         A11yKeyboardMonitorState::new(conn, &name_owners, &state.0.executor).await?;
     *state.0.a11y_keyboard_monitor.borrow_mut() = Some(a11y_keyboard_monitor_state);
@@ -107,6 +194,7 @@ async fn init_session(state: &DBusState) -> zbus::Result<()> {
     )
     .await?;
     *state.0.ei_state.borrow_mut() = Some(ei_state);
+    input_capture::init(conn, &name_owners, state.0.input_capture_sender.clone()).await?;
     Ok(())
 }
 
