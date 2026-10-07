@@ -2,7 +2,9 @@
 
 **Audience:** [DennisFury](https://github.com/DennisFury) (author of the original InputCapture PRs) and anyone championing Deskflow/Synergy on COSMIC Wayland.
 
-**Intent:** You already built the InputCapture path ([cosmic-comp#2853](https://github.com/pop-os/cosmic-comp/pull/2853), [portal-cosmic#369](https://github.com/pop-os/xdg-desktop-portal-cosmic/pull/369)). Barriers and keyboard/pointer work. Clipboard did not. This repo pair adds the missing CLIPBOARD glue. **Please take these patches upstream to Pop/COSMIC** — Rob is not lobbying maintainers.
+**Framing — second half / finishing the job.** Your InputCapture PRs ([cosmic-comp#2853](https://github.com/pop-os/cosmic-comp/pull/2853), [portal-cosmic#369](https://github.com/pop-os/xdg-desktop-portal-cosmic/pull/369)) scaffolded the real path: consent, EIS, barriers, seat ownership. Deskflow and the portal *specs* were already willing to talk. What remained were **empty sockets** — `clipboard_enabled: false`, no Clipboard impl, no compositor bridge to selection — so the conversation never happened. This handoff **fills those gaps**. Cursor-hiding was UI sugar on top; the **core** is now strung together because the primitives (ext-data-control, smithay selection, portal Clipboard sequence, Deskflow’s libportal calls) were already there waiting.
+
+**Intent:** Barriers and keyboard/pointer worked; CLIPBOARD did not. These patches complete that stack. **Please take them upstream to Pop/COSMIC** — Rob is not lobbying maintainers.
 
 Deskflow itself needs **no code change** for CLIPBOARD. It already calls the portal correctly.
 
@@ -41,7 +43,7 @@ Patches under `handoff/patches/` in each repo (and mirrored as uniquely named fi
 9d35e63..1bd6614    →  portal InputCapture + Clipboard (ext-data-control) + unit tests
 ```
 
-Your prior work lives on local tracking branches `pr-2853` / `pr-369` (`d618128f` / `3fddb5a`). Cursor-hide from lordvorp (`1cc09b06`) was already folded into your compositor PR; this handoff is the **clipboard follow-on**, not a rewrite of your EIS/consent design.
+Your prior work lives on local tracking branches `pr-2853` / `pr-369` (`d618128f` / `3fddb5a`). Cursor-hide from lordvorp (`1cc09b06`) was already folded into your compositor PR as polish. This handoff is the **clipboard second half** — wiring what the scaffold left empty — not a rewrite of your EIS/consent design.
 
 ## Stack (working CLIPBOARD path)
 
