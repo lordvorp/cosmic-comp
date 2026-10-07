@@ -28,8 +28,8 @@ Deskflow / libportal were waiting on a conversation the DE never finished.
 
 | Repo | Branch | Tip | Baseline |
 |------|--------|-----|----------|
-| [lordvorp/cosmic-comp](https://github.com/lordvorp/cosmic-comp) | `inputcapture-on-41497b42` | `89b4b21c` | `41497b42` (pop-os master at cut) |
-| [lordvorp/xdg-desktop-portal-cosmic](https://github.com/lordvorp/xdg-desktop-portal-cosmic) | `inputcapture-on-4902f57` | `1bd6614` | `9d35e63` (rebased onto current master) |
+| [lordvorp/cosmic-comp](https://github.com/lordvorp/cosmic-comp) | `inputcapture-on-41497b42` | `9b293983` | `41497b42` (pop-os master at cut) |
+| [lordvorp/xdg-desktop-portal-cosmic](https://github.com/lordvorp/xdg-desktop-portal-cosmic) | `inputcapture-on-4902f57` | `0d04533` | `9d35e63` (rebased onto current master) |
 
 Compare URLs:
 
@@ -39,8 +39,8 @@ Compare URLs:
 Patches under `handoff/patches/` in each repo (and mirrored as uniquely named files in release assets):
 
 ```text
-41497b42..89b4b21c  →  cosmic-comp InputCapture D-Bus + unit tests
-9d35e63..1bd6614    →  portal InputCapture + Clipboard (ext-data-control) + unit tests
+41497b42..9b293983  →  cosmic-comp InputCapture D-Bus + unit tests + handoff docs
+9d35e63..0d04533    →  portal InputCapture + Clipboard (ext-data-control) + tests + patches
 ```
 
 Your prior work lives on local tracking branches `pr-2853` / `pr-369` (`d618128f` / `3fddb5a`). Cursor-hide from lordvorp (`1cc09b06`) was already folded into your compositor PR as polish. This handoff is the **clipboard second half** — wiring what the scaffold left empty — not a rewrite of your EIS/consent design.
@@ -84,7 +84,11 @@ Proven on sheila (Deskflow 1.27 server, COSMIC) ↔ cypher (client): text transf
 
 ## Unofficial test .debs
 
-If present under a GitHub Release on these forks, they are **unofficial lordvorp test builds** (versions like `0.1+lordvorp1` / `1.10.0+lordvorp1` / `1.21.1-1lordvorp1`), not a Pop apt repo. Use for smoke-testing only.
+GitHub Release on the cosmic-comp fork (assets include all three packages + patches):
+
+https://github.com/lordvorp/cosmic-comp/releases/tag/inputcapture-clipboard-lordvorp1
+
+Versions: `0.1+lordvorp1` / `1.10.0+lordvorp1` / `1.21.1-1lordvorp1`. **Not a Pop apt repo** — smoke-testing only. See `INSTALL.md` in the release.
 
 ## Contact
 
