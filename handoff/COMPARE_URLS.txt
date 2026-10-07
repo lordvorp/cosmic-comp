@@ -1,0 +1,2 @@
+cosmic-comp: https://github.com/lordvorp/cosmic-comp/compare/41497b42...inputcapture-on-41497b42
+xdg-desktop-portal-cosmic: https://github.com/lordvorp/xdg-desktop-portal-cosmic/compare/9d35e63...inputcapture-on-4902f57
