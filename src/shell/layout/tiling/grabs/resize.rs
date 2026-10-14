@@ -103,6 +103,7 @@ impl PointerTarget<State> for ResizeForkTarget {
                         orientation,
                         output,
                         ReleaseMode::NoMouseButtons,
+                        &seat,
                     ),
                     serial,
                     Focus::Clear,
@@ -157,6 +158,7 @@ impl TouchTarget<State> for ResizeForkTarget {
                     orientation,
                     output,
                     ReleaseMode::NoMouseButtons,
+                    &seat,
                 ),
                 serial,
             )
@@ -211,6 +213,7 @@ impl TabletToolTarget<State> for ResizeForkTarget {
                     orientation,
                     output,
                     ReleaseMode::NoMouseButtons,
+                    &seat,
                 ),
                 time,
                 serial,
@@ -291,6 +294,7 @@ impl TabletToolTarget<State> for ResizeForkTarget {
 
 pub struct ResizeForkGrab {
     start_data: GrabStartData,
+    seat: Seat<State>,
     last_loc: Point<f64, Global>,
     old_tree: Option<Tree<Data>>,
     accumulated_delta: f64,
@@ -310,9 +314,17 @@ impl ResizeForkGrab {
         orientation: Orientation,
         output: WeakOutput,
         release: ReleaseMode,
+        seat: &Seat<State>,
     ) -> ResizeForkGrab {
+        let cursor_state = seat.user_data().get::<CursorState>().unwrap();
+        cursor_state.lock().unwrap().hold_grab_shape(match orientation {
+            Orientation::Horizontal => CursorIcon::RowResize,
+            Orientation::Vertical => CursorIcon::ColResize,
+        });
+
         ResizeForkGrab {
             start_data,
+            seat: seat.clone(),
             last_loc: pointer_loc,
             old_tree: None,
             accumulated_delta: 0.0,
@@ -322,6 +334,13 @@ impl ResizeForkGrab {
             orientation,
             release,
         }
+    }
+}
+
+impl Drop for ResizeForkGrab {
+    fn drop(&mut self) {
+        let cursor_state = self.seat.user_data().get::<CursorState>().unwrap();
+        cursor_state.lock().unwrap().clear_grab_shape();
     }
 }
 

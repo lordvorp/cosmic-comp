@@ -4509,6 +4509,7 @@ impl Shell {
                 orientation,
                 ws.output.downgrade(),
                 ReleaseMode::Click,
+                seat,
             )
             .into()
         };
@@ -4796,6 +4797,7 @@ impl Shell {
                 orientation,
                 ws.output.downgrade(),
                 ReleaseMode::NoMouseButtons,
+                seat,
             )
             .into()
         };

@@ -559,7 +559,7 @@ impl ResizeSurfaceGrab {
         };
         if let Some(shape) = shape {
             let cursor_state = seat.user_data().get::<CursorState>().unwrap();
-            cursor_state.lock().unwrap().set_shape(shape);
+            cursor_state.lock().unwrap().set_grab_shape(shape);
         }
 
         ResizeSurfaceGrab {
@@ -695,6 +695,6 @@ impl ResizeSurfaceGrab {
 impl Drop for ResizeSurfaceGrab {
     fn drop(&mut self) {
         let cursor_state = self.seat.user_data().get::<CursorState>().unwrap();
-        cursor_state.lock().unwrap().unset_shape();
+        cursor_state.lock().unwrap().clear_grab_shape();
     }
 }

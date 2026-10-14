@@ -482,6 +482,10 @@ impl HideReason {
 pub type CursorState = Mutex<CursorStateInner>;
 pub struct CursorStateInner {
     current_cursor: Option<CursorIcon>,
+    /// Cursor chosen by an active pointer grab (resize, and similar).
+    /// `unset_shape` leaves this in place: starting the grab clears focus, and
+    /// that leave would otherwise replace the grab cursor with the default arrow.
+    grab_shape: Option<CursorIcon>,
 
     cursor_theme: CursorTheme,
     cursor_size: u32,
@@ -552,7 +556,27 @@ impl CursorStateInner {
         self.current_cursor = Some(shape);
     }
 
+    /// Claim the cursor for a grab that is about to clear pointer focus.
+    pub fn set_grab_shape(&mut self, shape: CursorIcon) {
+        self.grab_shape = Some(shape);
+        self.current_cursor = Some(shape);
+    }
+
+    /// Keep whatever shape is already showing, or `fallback` if none is set.
+    pub fn hold_grab_shape(&mut self, fallback: CursorIcon) {
+        self.set_grab_shape(self.current_cursor.unwrap_or(fallback));
+    }
+
     pub fn unset_shape(&mut self) {
+        if self.grab_shape.is_some() {
+            return;
+        }
+        self.current_cursor = None;
+    }
+
+    /// Drop a grab-owned cursor so the restored pointer focus can choose the next shape.
+    pub fn clear_grab_shape(&mut self) {
+        self.grab_shape = None;
         self.current_cursor = None;
     }
 
@@ -715,6 +739,7 @@ impl Default for CursorStateInner {
         let (theme, size) = load_cursor_theme();
         CursorStateInner {
             current_cursor: None,
+            grab_shape: None,
 
             cursor_size: size,
             cursor_theme: theme,
@@ -1021,7 +1046,20 @@ fn hide_cursor(state: &mut State, seat: &Seat<State>, reason: HideReason) {
 
 #[cfg(test)]
 mod test {
-    use super::{HideReason, PointerEventKind};
+    use super::{CursorStateInner, HideReason, PointerEventKind};
+    use smithay::input::pointer::CursorIcon;
+
+    #[test]
+    fn grab_shape_survives_the_leave_that_starts_a_resize() {
+        let mut cursor = CursorStateInner::default();
+        cursor.set_shape(CursorIcon::NwResize);
+        cursor.hold_grab_shape(CursorIcon::SeResize);
+        // Focus::Clear on grab start calls leave, which unsets the hover shape.
+        cursor.unset_shape();
+        assert_eq!(cursor.current_cursor, Some(CursorIcon::NwResize));
+        cursor.clear_grab_shape();
+        assert_eq!(cursor.current_cursor, None);
+    }
 
     #[test]
     fn touch_hidden_cursor_waits_for_movement() {
