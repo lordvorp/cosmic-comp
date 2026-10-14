@@ -667,6 +667,12 @@ impl ResizeSurfaceGrab {
     }
 
     fn ungrab(&mut self) {
+        // Release the cursor before focus is restored. The grab object itself is
+        // dropped only after that restore, so clearing in Drop would wipe the
+        // resize icon the border just set back.
+        let cursor_state = self.seat.user_data().get::<CursorState>().unwrap();
+        cursor_state.lock().unwrap().clear_grab_shape();
+
         // No more buttons are pressed, release the grab.
         self.seat
             .user_data()
@@ -692,9 +698,3 @@ impl ResizeSurfaceGrab {
     }
 }
 
-impl Drop for ResizeSurfaceGrab {
-    fn drop(&mut self) {
-        let cursor_state = self.seat.user_data().get::<CursorState>().unwrap();
-        cursor_state.lock().unwrap().clear_grab_shape();
-    }
-}

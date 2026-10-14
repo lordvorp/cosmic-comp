@@ -337,8 +337,10 @@ impl ResizeForkGrab {
     }
 }
 
-impl Drop for ResizeForkGrab {
-    fn drop(&mut self) {
+impl ResizeForkGrab {
+    /// Release the cursor before focus is restored. Drop runs after that restore
+    /// and would wipe the resize icon the border just set back.
+    fn release_cursor(&self) {
         let cursor_state = self.seat.user_data().get::<CursorState>().unwrap();
         cursor_state.lock().unwrap().clear_grab_shape();
     }
@@ -635,6 +637,7 @@ impl PointerGrab<State> for ResizeForkGrab {
     }
 
     fn unset(&mut self, data: &mut State) {
+        self.release_cursor();
         self.update_location(data, self.last_loc.as_logical(), true);
     }
 }
@@ -713,6 +716,7 @@ impl TouchGrab<State> for ResizeForkGrab {
     }
 
     fn unset(&mut self, data: &mut State) {
+        self.release_cursor();
         self.update_location(data, self.last_loc.as_logical(), true);
     }
 }
@@ -796,6 +800,7 @@ impl TabletToolGrab<State> for ResizeForkGrab {
     }
 
     fn unset(&mut self, data: &mut State) {
+        self.release_cursor();
         self.update_location(data, self.last_loc.as_logical(), true);
     }
 

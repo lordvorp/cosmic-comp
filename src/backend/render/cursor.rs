@@ -1057,8 +1057,11 @@ mod test {
         // Focus::Clear on grab start calls leave, which unsets the hover shape.
         cursor.unset_shape();
         assert_eq!(cursor.current_cursor, Some(CursorIcon::NwResize));
+        // The grab releases its claim before focus returns to the border.
         cursor.clear_grab_shape();
         assert_eq!(cursor.current_cursor, None);
+        cursor.set_shape(CursorIcon::NwResize);
+        assert_eq!(cursor.current_cursor, Some(CursorIcon::NwResize));
     }
 
     #[test]
