@@ -205,14 +205,18 @@ fn init_libinput(
 
     evlh.insert_source(libinput_backend, move |mut event, _, state| {
         if let InputEvent::DeviceAdded { device } = &mut event {
-            state.common.config.read_device(device);
             state
                 .backend
                 .kms()
                 .input_devices
                 .insert(device.name().into(), device.clone());
+            // Re-apply every device. A newly attached external mouse has to
+            // mute touchpad companions that libinput cannot suspend itself,
+            // and removing one has to bring those companions back.
+            crate::config::update_input(state);
         } else if let InputEvent::DeviceRemoved { device } = &event {
             state.backend.kms().input_devices.remove(&*device.name());
+            crate::config::update_input(state);
         }
 
         state.process_input_event(event, crate::input::InputBackendId::Normal);
