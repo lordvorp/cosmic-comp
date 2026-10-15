@@ -1,2 +1,4 @@
-cosmic-comp: https://github.com/lordvorp/cosmic-comp/compare/41497b42...inputcapture-on-41497b42
+index: https://github.com/lordvorp/cosmic-comp/blob/inputcapture-on-41497b42/DOWNSTREAM.md
+cosmic-comp (Deskflow range, after public resize-cursor commits): https://github.com/lordvorp/cosmic-comp/compare/10ebfd13...inputcapture-on-41497b42
 xdg-desktop-portal-cosmic: https://github.com/lordvorp/xdg-desktop-portal-cosmic/compare/9d35e63...inputcapture-on-4902f57
+resize-cursor (public, not a Deskflow request): https://github.com/lordvorp/cosmic-comp/compare/742b800b...resize-cursor

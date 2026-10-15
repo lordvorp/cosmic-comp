@@ -1,6 +1,6 @@
 # Handoff: COSMIC InputCapture + Clipboard for Deskflow
 
-**Audience:** [DennisFury](https://github.com/DennisFury) (author of the original InputCapture PRs) and anyone championing Deskflow/Synergy on COSMIC Wayland.
+**Audience:** [Chris Rizzitello](https://github.com/sithlord48) (Deskflow) and [DennisFury](https://github.com/DennisFury) (author of the original InputCapture PRs). Index for assistants: [DOWNSTREAM.md](DOWNSTREAM.md). These forks are public.
 
 **Framing — second half / finishing the job.** Your InputCapture PRs ([cosmic-comp#2853](https://github.com/pop-os/cosmic-comp/pull/2853), [portal-cosmic#369](https://github.com/pop-os/xdg-desktop-portal-cosmic/pull/369)) scaffolded the real path: consent, EIS, barriers, seat ownership. Deskflow and the portal *specs* were already willing to talk. What remained were **empty sockets** — `clipboard_enabled: false`, no Clipboard impl, no compositor bridge to selection — so the conversation never happened. This handoff **fills those gaps**. Cursor-hiding was UI sugar on top; the **core** is now strung together because the primitives (ext-data-control, smithay selection, portal Clipboard sequence, Deskflow’s libportal calls) were already there waiting.
 
@@ -26,21 +26,23 @@ Deskflow / libportal were waiting on a conversation the DE never finished.
 
 ## What we shipped (lordvorp forks)
 
-| Repo | Branch | Tip | Baseline |
-|------|--------|-----|----------|
-| [lordvorp/cosmic-comp](https://github.com/lordvorp/cosmic-comp) | `inputcapture-on-41497b42` | `9b293983` | `41497b42` (pop-os master at cut) |
-| [lordvorp/xdg-desktop-portal-cosmic](https://github.com/lordvorp/xdg-desktop-portal-cosmic) | `inputcapture-on-4902f57` | `0d04533` | `9d35e63` (rebased onto current master) |
+| Repo | Branch | Deskflow baseline |
+|------|--------|-------------------|
+| [lordvorp/cosmic-comp](https://github.com/lordvorp/cosmic-comp) | `inputcapture-on-41497b42` | `10ebfd13` (see note) |
+| [lordvorp/xdg-desktop-portal-cosmic](https://github.com/lordvorp/xdg-desktop-portal-cosmic) | `inputcapture-on-4902f57` | `9d35e63` (rebased onto current master) |
 
-Compare URLs:
+Compare URLs for the Deskflow work:
 
-- Comp: https://github.com/lordvorp/cosmic-comp/compare/41497b42...inputcapture-on-41497b42
+- Comp: https://github.com/lordvorp/cosmic-comp/compare/10ebfd13...inputcapture-on-41497b42
 - Portal: https://github.com/lordvorp/xdg-desktop-portal-cosmic/compare/9d35e63...inputcapture-on-4902f57
+
+The compositor branch is stacked on two **public** resize-cursor commits (`db2db0b8`, `10ebfd13`, branch `resize-cursor`). Those fix window-border drag cursor feedback. They are not part of this handoff. The compare above starts after them. Details: [DOWNSTREAM.md](DOWNSTREAM.md).
 
 Patches under `handoff/patches/` in each repo (and mirrored as uniquely named files in release assets):
 
 ```text
-41497b42..9b293983  →  cosmic-comp InputCapture D-Bus + unit tests + handoff docs
-9d35e63..0d04533    →  portal InputCapture + Clipboard (ext-data-control) + tests + patches
+10ebfd13..inputcapture-on-41497b42  →  cosmic-comp InputCapture D-Bus + cursor-hide while captured + tests + docs
+9d35e63..inputcapture-on-4902f57    →  portal InputCapture + Clipboard (ext-data-control) + tests + patches
 ```
 
 Your prior work lives on local tracking branches `pr-2853` / `pr-369` (`d618128f` / `3fddb5a`). Cursor-hide from lordvorp (`1cc09b06`) was already folded into your compositor PR as polish. This handoff is the **clipboard second half** — wiring what the scaffold left empty — not a rewrite of your EIS/consent design.
