@@ -36,7 +36,7 @@ Compare URLs for the Deskflow work:
 - Comp: https://github.com/lordvorp/cosmic-comp/compare/10ebfd13...inputcapture-on-41497b42
 - Portal: https://github.com/lordvorp/xdg-desktop-portal-cosmic/compare/9d35e63...inputcapture-on-4902f57
 
-The compositor branch is stacked on two **public** resize-cursor commits (`db2db0b8`, `10ebfd13`, branch `resize-cursor`). Those fix window-border drag cursor feedback. They are not part of this handoff. The compare above starts after them. Details: [DOWNSTREAM.md](DOWNSTREAM.md).
+Aside, not this handoff: the compositor branch is stacked on two resize-cursor commits (`db2db0b8`, `10ebfd13`, branch `resize-cursor`). Those fix window-border drag cursor feedback. The Deskflow compare above starts after them. Details are under "Aside" in [DOWNSTREAM.md](DOWNSTREAM.md).
 
 Patches under `handoff/patches/` in each repo (and mirrored as uniquely named files in release assets):
 

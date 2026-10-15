@@ -2,6 +2,8 @@
 
 This file is the index. It is public. Point a reader, human or assistant, at this document and then at the compare URLs in each section.
 
+Sections 1 through 3 are the Deskflow request: InputCapture and Clipboard. The section titled "Aside" is a personal cosmic-comp cursor fix. It is public, and it is not part of that request.
+
 **Who this is for:** [Chris Rizzitello](https://github.com/sithlord48) (Deskflow / the active Synergy line), who filed the COSMIC portal gap ([pop-os/xdg-desktop-portal-cosmic#197](https://github.com/pop-os/xdg-desktop-portal-cosmic/issues/197)) and who is filling the Wayland InputCapture + Clipboard path Deskflow already calls.
 
 **Who this is not aimed at:** Pop / cosmic-comp maintainers. Rob is not opening Pop pull requests. An earlier InputCapture scaffold ([cosmic-comp#2853](https://github.com/pop-os/cosmic-comp/pull/2853), [xdg-desktop-portal-cosmic#369](https://github.com/pop-os/xdg-desktop-portal-cosmic/pull/369), author [DennisFury](https://github.com/DennisFury)) was closed. This bundle finishes the empty sockets those PRs left, on public forks, for Deskflow to use or champion.
@@ -108,9 +110,11 @@ After: text crossed both ways. A short string showed up with clipboard size grea
 
 ---
 
-## Public, and not a request to Deskflow
+## Aside — personal resize-cursor fixes
 
-The compositor branch `inputcapture-on-41497b42` is stacked on two commits that fix **window-border resize cursor** behavior (the icon disappearing on press, and not coming back on release while the pointer is still on the border):
+This aside is not the Deskflow bridge. Skip it if you are here for InputCapture and Clipboard.
+
+The compositor branch `inputcapture-on-41497b42` is stacked on two commits that fix window-border resize cursor behavior (the icon disappearing on press, and not coming back on release while the pointer is still on the border):
 
 | Commit | Branch | What |
 |--------|--------|------|
@@ -119,7 +123,7 @@ The compositor branch `inputcapture-on-41497b42` is stacked on two commits that 
 
 https://github.com/lordvorp/cosmic-comp/compare/742b800b...resize-cursor
 
-Those commits are public on purpose. They are a separate conversation with cosmic-comp. They are not part of the Deskflow clipboard bridge. The Section 1 compare starts at `10ebfd13` so a review of the Deskflow work does not have to include them. Anyone may still read them.
+Those commits are a separate conversation with cosmic-comp maintainers. The Section 1 compare starts at `10ebfd13` so a review of InputCapture and Clipboard does not include them.
 
 ---
 
