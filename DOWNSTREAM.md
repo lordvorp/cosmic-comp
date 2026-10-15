@@ -88,7 +88,11 @@ Pop noble's packaged frontend **1.18.4** does not offer Clipboard on InputCaptur
 
 No Deskflow or cosmic-comp change fixes that. The host needs a frontend ≥ 1.21, then a restart of `xdg-desktop-portal.service` (and the cosmic impl portal) **without** killing the running compositor mid-session.
 
-Unofficial packaging commit on the local tree `~/work/xdg-desktop-portal`, branch `packaging-1.21.1-lordvorp`, commit `5b884534`: debian metadata only, version `1.21.1-1lordvorp1`. It is a test package, not an Ubuntu or Pop archive. Smoke debs from the earlier handoff release:
+The debian metadata only (version `1.21.1-1lordvorp1`) is public here:
+
+https://github.com/lordvorp/xdg-desktop-portal
+
+That repository is the `debian/` delta, not a full history fork. Upstream source is the unchanged tag `1.21.1` (`ced43a7c`). It is a test package, not an Ubuntu or Pop archive. Smoke debs from the earlier handoff release:
 
 https://github.com/lordvorp/cosmic-comp/releases/tag/inputcapture-clipboard-lordvorp1
 
