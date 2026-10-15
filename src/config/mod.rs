@@ -26,15 +26,15 @@ pub use smithay::{
     reexports::{
         calloop::LoopHandle,
         input::{
-            AccelProfile, ClickMethod, Device as InputDevice, ScrollMethod, SendEventsMode,
-            TapButtonMap,
+            AccelProfile, ClickMethod, Device as InputDevice, DeviceCapability, DeviceGroup,
+            ScrollMethod, SendEventsMode, TapButtonMap,
         },
     },
     utils::{Logical, Physical, Point, SERIAL_COUNTER, Size, Transform},
 };
 use std::{
     cell::{Ref, RefCell},
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fs::OpenOptions,
     io::Write,
     path::PathBuf,
@@ -44,6 +44,7 @@ use tracing::{error, warn};
 
 mod input_config;
 pub mod key_bindings;
+mod touchpad_policy;
 mod types;
 
 use cosmic::config::CosmicTk;
@@ -51,7 +52,7 @@ pub use cosmic_comp_config::EdidProduct;
 use cosmic_comp_config::{
     ActivationPolicy, AppearanceConfig, CosmicCompConfig, CursorHideConfig, DecorationPreference,
     KeyboardConfig, TileBehavior, XkbConfig, XwaylandDescaling, XwaylandEavesdropping, ZoomConfig,
-    input::{DeviceState as InputDeviceState, InputConfig, TouchpadOverride},
+    input::{InputConfig, TouchpadOverride},
     output::comp::{
         OutputConfig, OutputInfo, OutputState, OutputsConfig, TransformDef, load_outputs,
     },
@@ -639,8 +640,28 @@ impl Config {
         self.cosmic_conf.xkb_config.clone()
     }
 
-    pub fn read_device(&self, device: &mut InputDevice) {
-        let (device_config, default_config) = self.get_device_config(device);
+    pub fn read_device(
+        &self,
+        device: &mut InputDevice,
+        relation: touchpad_policy::PadRelation,
+        external_pointer_present: bool,
+    ) {
+        let (mut device_config, default_config) = self.get_device_config(device);
+        let supports_disable_on_external_mouse = device
+            .config_send_events_modes()
+            .contains(SendEventsMode::DISABLED_ON_EXTERNAL_MOUSE);
+        if let Some(state) = touchpad_policy::override_state(
+            relation,
+            self.cosmic_conf.input_touchpad_override,
+            external_pointer_present,
+            supports_disable_on_external_mouse,
+        ) {
+            device_config = Some({
+                let mut config = device_config.unwrap_or_default();
+                config.state = state;
+                config
+            });
+        }
         input_config::update_device(device, device_config.as_ref(), default_config);
     }
 
@@ -671,16 +692,7 @@ impl Config {
             &self.cosmic_conf.input_default
         };
 
-        let mut device_config = self.cosmic_conf.input_devices.get(&*device.name()).cloned();
-        if is_touchpad && self.cosmic_conf.input_touchpad_override == TouchpadOverride::ForceDisable
-        {
-            device_config = Some({
-                let mut config = device_config.unwrap_or_default();
-                config.state = InputDeviceState::Disabled;
-                config
-            });
-        }
-
+        let device_config = self.cosmic_conf.input_devices.get(&*device.name()).cloned();
         (device_config, default_config)
     }
 }
@@ -782,11 +794,35 @@ fn get_config<T: Default + serde::de::DeserializeOwned>(
     })
 }
 
-fn update_input(state: &mut State) {
-    if let BackendData::Kms(kms_state) = &mut state.backend {
-        for device in kms_state.input_devices.values_mut() {
-            state.common.config.read_device(device);
-        }
+pub(crate) fn update_input(state: &mut State) {
+    let BackendData::Kms(kms_state) = &mut state.backend else {
+        return;
+    };
+
+    let touchpad_groups: HashSet<DeviceGroup> = kms_state
+        .input_devices
+        .values()
+        .filter(|device| device.config_tap_finger_count() > 0)
+        .map(|device| device.device_group())
+        .collect();
+    let external_pointer_present = kms_state.input_devices.values().any(|device| {
+        device.has_capability(DeviceCapability::Pointer)
+            && device.config_tap_finger_count() == 0
+            && !touchpad_groups.contains(&device.device_group())
+    });
+
+    for device in kms_state.input_devices.values_mut() {
+        let relation = if device.config_tap_finger_count() > 0 {
+            touchpad_policy::PadRelation::Touchpad
+        } else if touchpad_groups.contains(&device.device_group()) {
+            touchpad_policy::PadRelation::Companion
+        } else {
+            touchpad_policy::PadRelation::Unrelated
+        };
+        state
+            .common
+            .config
+            .read_device(device, relation, external_pointer_present);
     }
 }
 

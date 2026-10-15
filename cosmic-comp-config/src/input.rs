@@ -62,6 +62,13 @@ pub enum TouchpadOverride {
     #[default]
     None,
     ForceDisable,
+    /// Disable the touchpad while an external pointer is connected.
+    ///
+    /// Other kernel nodes in the same libinput device group follow this
+    /// state. Dell clickpads expose a second relative "Mouse" node beside
+    /// the touchpad, and that node is what still moves the pointer after
+    /// disable-while-typing mutes the touchpad itself.
+    DisableOnExternalMouse,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
